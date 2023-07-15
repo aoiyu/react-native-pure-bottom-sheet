@@ -221,7 +221,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
                   translateY: Animated.diffClamp(
                     panAnimation.y,
                     0,
-                    Dimensions.get("window").height
+                    Number.MAX_SAFE_INTEGER
                   ),
                 },
               ],
