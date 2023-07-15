@@ -45,7 +45,7 @@ const convertSnapTargetToPanOffset = (
     case "max":
       return 0;
     case "content":
-      return sheetHeight - contentHeight;
+      return sheetHeight - contentHeight - 48;
     default:
       return sheetHeight; // default close
   }
@@ -98,14 +98,13 @@ export const BottomSheet = (props: BottomSheetProps) => {
     });
   }, [snap]);
 
-  const containerLayoutRef = useRef({
-    width: 0,
-    height: 0,
-  });
-
   const [sheetHeight, setSheetHeight] = useState(0);
   const sheetHeightRef = useRef(0);
   sheetHeightRef.current = sheetHeight;
+
+  const [contentHeight, setContentHeight] = useState(0);
+  const contentHeightRef = useRef(0);
+  contentHeightRef.current = contentHeight;
 
   const panAnimation = useRef(
     new Animated.ValueXY({
@@ -150,12 +149,12 @@ export const BottomSheet = (props: BottomSheetProps) => {
           x: 0,
           y: panOffset.y > 0 ? gestureState.dy : 0,
         });
-        // console.debug("pan", panOffset, containerLayoutRef.current.height);
+        // console.debug("pan", panOffset);
         setSnapState((prevState) => {
           const index = convertPanOffsetToSnapIndex(
             panOffset,
             prevState.targets,
-            200,
+            contentHeightRef.current,
             sheetHeightRef.current
           );
           console.debug("snap to index", index, prevState.targets[index]);
@@ -168,14 +167,18 @@ export const BottomSheet = (props: BottomSheetProps) => {
 
   useEffect(() => {
     const snapTarget = snapState.targets[snapState.index];
-    const y = convertSnapTargetToPanOffset(snapTarget, 200, sheetHeight);
+    const y = convertSnapTargetToPanOffset(
+      snapTarget,
+      contentHeight,
+      sheetHeight
+    );
     Animated.spring(panAnimation, {
       toValue: { x: 0, y: y },
       overshootClamping: true,
       useNativeDriver: true,
     }).start();
     return () => panAnimation.stopAnimation();
-  }, [snapState, sheetHeight]);
+  }, [snapState, sheetHeight, contentHeight]);
 
   /* Backdrop fade animation */
   const fadeAnimation = useRef(new Animated.Value(0));
@@ -189,14 +192,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
   }, [snapState]);
 
   return (
-    <View
-      style={[StyleSheet.absoluteFill, style]}
-      pointerEvents={"box-none"}
-      onLayout={(e) => {
-        containerLayoutRef.current.width = e.nativeEvent.layout.width;
-        containerLayoutRef.current.height = e.nativeEvent.layout.height;
-      }}
-    >
+    <View style={[StyleSheet.absoluteFill, style]} pointerEvents={"box-none"}>
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
@@ -237,7 +233,17 @@ export const BottomSheet = (props: BottomSheetProps) => {
           <View style={styles.handleContainer} {...panResponder.panHandlers}>
             <View style={styles.handleIcon} />
           </View>
-          {children}
+          {snapState.targets.includes("content") ? (
+            <View
+              onLayout={(e) => {
+                setContentHeight(e.nativeEvent.layout.height);
+              }}
+            >
+              {children}
+            </View>
+          ) : (
+            children
+          )}
         </Animated.View>
       </View>
     </View>
