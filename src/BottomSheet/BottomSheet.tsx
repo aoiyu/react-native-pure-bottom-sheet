@@ -94,7 +94,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
   useLayoutEffect(() => {
     setSnapState({
       index: snap.index,
-      targets: snapState.targets ?? defaultSnapTargets,
+      targets: snap.targets ?? defaultSnapTargets,
     });
   }, [snap]);
 
