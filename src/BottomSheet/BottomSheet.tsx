@@ -25,9 +25,10 @@ export type BottomSheetProps = {
   contentStyle?: StyleProp<ViewStyle>;
   children: ReactElement;
   snap?: SnapStateType;
+  defaultSnapTargets?: SnapTargetType[];
 };
 
-export type SnapStateType = { index: number; targets: SnapTargetType[] };
+export type SnapStateType = { index: number; targets?: SnapTargetType[] };
 
 export type SnapTargetType = "min" | "max" | "content";
 
@@ -82,12 +83,19 @@ export const BottomSheet = (props: BottomSheetProps) => {
     sheetStyle,
     contentStyle,
     children,
-    snap = { index: 0, targets: ["min", "max"] },
+    snap = { index: 0 },
+    defaultSnapTargets = ["min", "max"],
   } = props;
 
-  const [snapState, setSnapState] = useState(snap);
+  const [snapState, setSnapState] = useState({
+    index: snap.index,
+    targets: snap.targets ?? defaultSnapTargets,
+  });
   useLayoutEffect(() => {
-    setSnapState(snap);
+    setSnapState({
+      index: snap.index,
+      targets: snapState.targets ?? defaultSnapTargets,
+    });
   }, [snap]);
 
   const containerLayoutRef = useRef({
