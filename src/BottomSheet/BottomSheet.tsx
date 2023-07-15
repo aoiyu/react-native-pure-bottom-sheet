@@ -31,7 +31,9 @@ export type SnapStateType = { index: number; targets: SnapTargetType[] };
 
 export type SnapTargetType = "min" | "max" | "content";
 
-const convertSnapTargetToNumber = (
+type PanOffsetType = { x: number; y: number };
+
+const convertSnapTargetToPanOffset = (
   target: SnapTargetType | undefined,
   contentHeight: number,
   sheetHeight: number
@@ -48,8 +50,8 @@ const convertSnapTargetToNumber = (
   }
 };
 
-const convertNumberToSnapIndex = (
-  value: number,
+const convertPanOffsetToSnapIndex = (
+  panOffset: PanOffsetType,
   targets: SnapTargetType[],
   contentHeight: number,
   sheetHeight: number
@@ -57,12 +59,12 @@ const convertNumberToSnapIndex = (
   let minDiff = Number.MAX_SAFE_INTEGER;
   let minDiffIndex = Number.MAX_SAFE_INTEGER;
   for (let i = 0; i < targets.length; i++) {
-    const targetValue = convertSnapTargetToNumber(
+    const targetValue = convertSnapTargetToPanOffset(
       targets[i],
       contentHeight,
       sheetHeight
     );
-    const diff = Math.abs(targetValue - value);
+    const diff = Math.abs(targetValue - panOffset.y);
     if (diff < minDiff) {
       minDiff = diff;
       minDiffIndex = i;
@@ -110,8 +112,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
   const panOffset = useRef({ x: 0, y: 0 }).current;
   useLayoutEffect(() => {
     const listenerId = panAnimation.addListener((value) => {
-      panOffset.x = -value.x;
-      panOffset.y = -value.y;
+      panOffset.x = value.x;
+      panOffset.y = value.y <= 0 ? 0 : value.y;
     });
     return () => panAnimation.removeListener(listenerId);
   }, []);
@@ -127,19 +129,28 @@ export const BottomSheet = (props: BottomSheetProps) => {
         panAnimation.setValue({ x: 0, y: gestureState.dy });
       },
       onPanResponderMove: (_event, gestureState) => {
-        panAnimation.setValue({ x: 0, y: gestureState.dy });
+        // console.debug("pan", panOffset, gestureState.dy);
+        if (panOffset.y >= 0) {
+          panAnimation.setValue({
+            x: 0,
+            y: gestureState.dy,
+          });
+        }
       },
       onPanResponderEnd: (_event, gestureState) => {
-        panAnimation.setValue({ x: 0, y: gestureState.dy });
-        console.debug("pan", panOffset, containerLayoutRef.current.height);
+        panAnimation.setValue({
+          x: 0,
+          y: panOffset.y > 0 ? gestureState.dy : 0,
+        });
+        // console.debug("pan", panOffset, containerLayoutRef.current.height);
         setSnapState((prevState) => {
-          const index = convertNumberToSnapIndex(
-            -panOffset.y,
+          const index = convertPanOffsetToSnapIndex(
+            panOffset,
             prevState.targets,
             200,
             sheetHeightRef.current
           );
-          console.debug("snap to index", index);
+          console.debug("snap to index", index, prevState.targets[index]);
           return { ...prevState, index: index };
         });
         panAnimation.flattenOffset();
@@ -149,8 +160,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
 
   useEffect(() => {
     const snapTarget = snapState.targets[snapState.index];
-    const y = convertSnapTargetToNumber(snapTarget, 200, sheetHeight);
-
+    const y = convertSnapTargetToPanOffset(snapTarget, 200, sheetHeight);
     Animated.spring(panAnimation, {
       toValue: { x: 0, y: y },
       overshootClamping: true,
@@ -170,7 +180,6 @@ export const BottomSheet = (props: BottomSheetProps) => {
     return () => fadeAnimation.current.stopAnimation();
   }, [snapState]);
 
-  console.debug("render");
   return (
     <View
       style={[StyleSheet.absoluteFill, style]}
@@ -198,16 +207,20 @@ export const BottomSheet = (props: BottomSheetProps) => {
               marginRight: offsets?.right,
               marginLeft: offsets?.left,
               marginBottom: offsets?.bottom,
-              transform: panAnimation.getTranslateTransform(),
+              transform: [
+                { translateX: panAnimation.x },
+                {
+                  translateY: Animated.diffClamp(
+                    panAnimation.y,
+                    0,
+                    Dimensions.get("window").height
+                  ),
+                },
+              ],
             },
             sheetStyle,
           ]}
           onLayout={(e) => {
-            console.debug(
-              "ol",
-              e.nativeEvent.layout.height,
-              Dimensions.get("window").height
-            );
             setSheetHeight(
               e.nativeEvent.layout.height + (offsets?.bottom ?? 0)
             );
