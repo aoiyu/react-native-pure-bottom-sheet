@@ -99,12 +99,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
   }, [snap]);
 
   const [sheetHeight, setSheetHeight] = useState(0);
-  const sheetHeightRef = useRef(0);
-  sheetHeightRef.current = sheetHeight;
-
   const [contentHeight, setContentHeight] = useState(0);
-  const contentHeightRef = useRef(0);
-  contentHeightRef.current = contentHeight;
 
   const panAnimation = useRef(
     new Animated.ValueXY({
@@ -120,10 +115,19 @@ export const BottomSheet = (props: BottomSheetProps) => {
   useLayoutEffect(() => {
     const listenerId = panAnimation.addListener((value) => {
       panOffset.x = value.x;
-      panOffset.y = value.y <= 0 ? 0 : value.y;
+      panOffset.y = value.y;
     });
     return () => panAnimation.removeListener(listenerId);
   }, []);
+
+  const currentPanOffsetToSnapIndex = useRef<() => number>(() => 0);
+  currentPanOffsetToSnapIndex.current = () =>
+    convertPanOffsetToSnapIndex(
+      panOffset,
+      snapState.targets,
+      contentHeight,
+      sheetHeight
+    );
 
   const panResponder = useRef(
     PanResponder.create({
@@ -136,7 +140,6 @@ export const BottomSheet = (props: BottomSheetProps) => {
         panAnimation.setValue({ x: 0, y: gestureState.dy });
       },
       onPanResponderMove: (_event, gestureState) => {
-        // console.debug("pan", panOffset, gestureState.dy);
         if (panOffset.y >= 0) {
           panAnimation.setValue({
             x: 0,
@@ -149,14 +152,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
           x: 0,
           y: panOffset.y > 0 ? gestureState.dy : 0,
         });
-        // console.debug("pan", panOffset);
         setSnapState((prevState) => {
-          const index = convertPanOffsetToSnapIndex(
-            panOffset,
-            prevState.targets,
-            contentHeightRef.current,
-            sheetHeightRef.current
-          );
+          const index = currentPanOffsetToSnapIndex.current();
           console.debug("snap to index", index, prevState.targets[index]);
           return { ...prevState, index: index };
         });
