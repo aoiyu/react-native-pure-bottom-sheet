@@ -1,13 +1,16 @@
 import React, {
   ReactElement,
+  useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import {
   Animated,
   Dimensions,
+  Easing,
   PanResponder,
   StyleProp,
   StyleSheet,
@@ -28,7 +31,10 @@ export type BottomSheetProps = {
   defaultSnapTargets?: SnapTargetType[];
 };
 
-export type SnapStateType = { index: number; targets?: SnapTargetType[] };
+export type SnapStateType = {
+  index: number;
+  targets?: SnapTargetType[];
+};
 
 export type SnapTargetType = "min" | "max" | "content";
 
@@ -45,7 +51,7 @@ const convertSnapTargetToPanOffset = (
     case "max":
       return 0;
     case "content":
-      return sheetHeight - contentHeight - 48;
+      return sheetHeight - contentHeight;
     default:
       return sheetHeight; // default close
   }
@@ -109,69 +115,75 @@ export const BottomSheet = (props: BottomSheetProps) => {
           ? Dimensions.get("window").height
           : 0,
     })
-  ).current; // todo: sheetのレイアウト後に再セットする
+  ).current;
 
-  const panOffset = useRef({ x: 0, y: 0 }).current;
+  const panOffset = useRef({ x: 0, y: 0 });
   useLayoutEffect(() => {
     const listenerId = panAnimation.addListener((value) => {
-      panOffset.x = value.x;
-      panOffset.y = value.y;
+      panOffset.current = value;
     });
     return () => panAnimation.removeListener(listenerId);
   }, []);
 
-  const currentPanOffsetToSnapIndex = useRef<() => number>(() => 0);
-  currentPanOffsetToSnapIndex.current = () =>
-    convertPanOffsetToSnapIndex(
-      panOffset,
+  const handleOnPanResponderReleased = useCallback(() => {
+    const index = convertPanOffsetToSnapIndex(
+      { ...panOffset.current },
       snapState.targets,
       contentHeight,
       sheetHeight
     );
+    Animated.timing(panAnimation, {
+      toValue: {
+        x: 0,
+        y: convertSnapTargetToPanOffset(
+          snapState.targets[index],
+          contentHeight,
+          sheetHeight
+        ),
+      },
+      easing: Easing.out(Easing.exp),
+      useNativeDriver: true,
+    }).start((r) => {
+      if (r.finished) {
+        setSnapState((prevState) => ({
+          ...prevState,
+          index: index,
+        }));
+      }
+    });
+    panAnimation.flattenOffset();
+  }, [snapState, contentHeight, sheetHeight]);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        panAnimation.extractOffset();
-      },
-      onPanResponderStart: (_event, gestureState) => {
-        panAnimation.setValue({ x: 0, y: gestureState.dy });
-      },
-      onPanResponderMove: (_event, gestureState) => {
-        if (panOffset.y >= 0) {
-          panAnimation.setValue({
-            x: 0,
-            y: gestureState.dy,
-          });
-        }
-      },
-      onPanResponderEnd: (_event, gestureState) => {
-        panAnimation.setValue({
-          x: 0,
-          y: panOffset.y > 0 ? gestureState.dy : 0,
-        });
-        setSnapState((prevState) => {
-          const index = currentPanOffsetToSnapIndex.current();
-          console.debug("snap to index", index, prevState.targets[index]);
-          return { ...prevState, index: index };
-        });
-        panAnimation.flattenOffset();
-      },
-    })
-  ).current;
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderStart: () => {
+          panAnimation.stopAnimation();
+          panAnimation.extractOffset();
+        },
+        onPanResponderMove: (_event, gestureState) => {
+          panAnimation.setValue({ x: 0, y: gestureState.dy });
+          if (panOffset.current.y < 0) {
+            panAnimation.setOffset({ x: 0, y: -gestureState.dy });
+          }
+        },
+        onPanResponderRelease: handleOnPanResponderReleased,
+        onPanResponderTerminate: handleOnPanResponderReleased,
+      }),
+    [handleOnPanResponderReleased]
+  );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const snapTarget = snapState.targets[snapState.index];
-    const y = convertSnapTargetToPanOffset(
-      snapTarget,
-      contentHeight,
-      sheetHeight
-    );
-    Animated.spring(panAnimation, {
-      toValue: { x: 0, y: y },
-      overshootClamping: true,
+    Animated.timing(panAnimation, {
+      toValue: {
+        x: 0,
+        y: convertSnapTargetToPanOffset(snapTarget, contentHeight, sheetHeight),
+      },
+      easing: Easing.out(Easing.exp),
+      duration: 500,
       useNativeDriver: true,
     }).start();
     return () => panAnimation.stopAnimation();
@@ -222,6 +234,9 @@ export const BottomSheet = (props: BottomSheetProps) => {
             sheetStyle,
           ]}
           onLayout={(e) => {
+            if (snapState.targets[snapState.index] === "min") {
+              panOffset.current.y = e.nativeEvent.layout.height;
+            }
             setSheetHeight(
               e.nativeEvent.layout.height + (offsets?.bottom ?? 0)
             );
@@ -233,7 +248,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
           {snapState.targets.includes("content") ? (
             <View
               onLayout={(e) => {
-                setContentHeight(e.nativeEvent.layout.height);
+                setContentHeight(e.nativeEvent.layout.height + 48);
               }}
             >
               {children}
