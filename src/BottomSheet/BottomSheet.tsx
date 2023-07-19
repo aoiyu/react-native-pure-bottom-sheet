@@ -83,11 +83,8 @@ const convertPanOffsetToSnapIndex = (
 export const BottomSheet = (props: BottomSheetProps) => {
   const {
     offsets,
-    onOpened,
-    onClosed,
     style,
     sheetStyle,
-    contentStyle,
     children,
     snap = { index: 0 },
     defaultSnapTargets = ["min", "max"],
