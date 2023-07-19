@@ -14,8 +14,6 @@ import {
   PanResponder,
   StyleProp,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
   ViewStyle,
 } from "react-native";
@@ -253,13 +251,6 @@ export const BottomSheet = (props: BottomSheetProps) => {
                 setContentHeight(e.nativeEvent.layout.height + 48);
               }}
             >
-              <TouchableOpacity
-                onPress={() => {
-                  panAnimation.setValue({ x: 0, y: 100 });
-                }}
-              >
-                <Text>translateY add</Text>
-              </TouchableOpacity>
               {children}
             </View>
           ) : (
