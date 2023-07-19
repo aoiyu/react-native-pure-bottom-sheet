@@ -63,7 +63,6 @@ yarn-debug.log
 yarn-error.log
 
 # yarn
-.yarn/
 .pnp.*
 .yarn/*
 !.yarn/patches
