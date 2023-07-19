@@ -7,9 +7,10 @@
   "react-native": "src/index",
   "source": "src/index",
   "scripts": {
-    "prepare": "yarn run build",
-    "build": "tsc",
-    "lint": "eslint src --ext .js,.jsx,.ts,.tsx; prettier --check src"
+    "build": "tsc --sourceMap",
+    "lint": "eslint src --ext .js,.jsx,.ts,.tsx; prettier --check src",
+    "typecheck": "tsc --noEmit",
+    "test": ""
   },
   "keywords": [
     "react-native",
